@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:batch="http://www.springframework.org/schema/batch"
+       xmlns:util="http://www.springframework.org/schema/util"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans	http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
+						http://www.springframework.org/schema/batch	http://www.springframework.org/schema/batch/spring-batch-2.1.xsd
+						http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util-3.0.xsd">
+
+    <import resource="applicationContext.xml"/>
+
+    <bean id="taskletStep" abstract="true" class="org.springframework.batch.core.step.tasklet.TaskletStep">
+        <property name="jobRepository" ref="jobRepository"/>
+        <property name="transactionManager" ref="transactionManager"/>
+    </bean>
+
+    <bean id="hello" class="taskletoriented.batch.PrintTasklet">
+        <property name="message" value="Hello"/>
+    </bean>
+
+    <bean id="world" class="taskletoriented.batch.PrintTasklet">
+        <property name="message" value=" World!"/>
+    </bean>
+
+    <bean id="failed" class="taskletoriented.batch.PrintTasklet">
+        <property name="message" value="Failed!"/>
+    </bean>
+
+    <job id="mySimpleJob" xmlns="http://www.springframework.org/schema/batch">
+        <step id="firstStep">
+            <tasklet ref="hello"/>
+            <next on="*" to="secondStep"/>
+            <next on="FAILED" to="thirdStep"/> <!-- if ExitCode=FAILED, then go to thirdStep-->
+        </step>
+
+
+        <step id="secondStep">
+            <tasklet ref="world"/>
+            <end on="*"/>
+            <next on="FAILED" to="thirdStep"/>
+        </step>
+        <step id="thirdStep">
+            <tasklet ref="failed"/>
+        </step>
+	</job>
+
+    <bean id="batchLauncher" class="taskletoriented.batch.BatchLauncher">
+        <property name="jobLauncher" ref="jobLauncher"/>
+        <property name="jobRepository" ref="jobRepository"/>
+        <property name="job" ref="mySimpleJob"/>
+    </bean>
+
+
+
+
+
+
+
+    <!--
+     commit-interval=2, so reader will be called twice and two User objects will be stored in memory.
+     Processor processes these two User objects one by one
+     Both User objects (list of User objects) are given to writer together
+    -->
+    <job id="chunkJob" xmlns="http://www.springframework.org/schema/batch">
+        <step id="step1" next="step2">
+            <tasklet>
+                <chunk reader='firstTestReader' processor='testProcessor' writer='testWriter' commit-interval='2'/>
+            </tasklet>
+        </step>
+        <step id="step2">
+            <tasklet>
+                <chunk reader='secondTestReader' processor='testProcessor' writer='testWriter' commit-interval='2'/>
+            </tasklet>
+        </step>
+    </job>
+
+    <!-- Reader Bean Declaration -->
+    <bean id='firstTestReader' class='chunkoriented.batch.TestReader'>
+        <property name='maxIndex' value='2'/>
+        <property name='namePrefix' value='firstname'/>
+        <property name='surnamePrefix' value='firstsurname'/>
+    </bean>
+    <bean id='secondTestReader' class='chunkoriented.batch.TestReader'>
+        <property name='maxIndex' value='2'/>
+        <property name='namePrefix' value='secondname'/>
+        <property name='surnamePrefix' value='secondsurname'/>
+    </bean>
+    <!-- Processor Bean Declaration -->
+    <bean id='testProcessor' class='chunkoriented.batch.TestProcessor' />
+    <!-- Writer Bean Declaration -->
+    <bean id='testWriter' class='chunkoriented.batch.TestWriter' >
+    </bean>
+
+    <bean id='batchProcessStarter' class='chunkoriented.batch.BatchProcessStarter'>
+        <property name='jobLauncher' ref='jobLauncher'/>
+        <property name='jobRepository' ref='jobRepository'/>
+        <property name='chunkJob' ref='chunkJob'/>
+    </bean>
+
+
+
+</beans>
